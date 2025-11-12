@@ -1,0 +1,8 @@
+{
+    "python.defaultInterpreterPath": "C:\\Users\\PC2502\\Anaconda3\\envs\\jup\\python.exe",
+    "jupyter.jupyterServerType": "local",
+    "jupyter.notebookFileRoot": "${workspaceFolder}",
+    "python.condaPath": "C:\\Users\\PC2502\\Anaconda3\\Scripts\\conda.exe",
+    "notebook.defaultKernel": "jup"
+}
+
