@@ -204,6 +204,18 @@ class Investor:
             # NaN이 아니고 유효한 가격일 때만 계산
             if current_price is not None and not pd.isna(current_price) and current_price > 0:
                 stock_value += quantity * current_price
+            else:
+                # 가격 데이터가 없을 때: 마지막 알려진 가격(매수가) 사용
+                # 이것은 데이터 품질 문제를 완화하기 위한 fallback입니다
+                avg_price = position.get('avg_price', 0)
+                if avg_price > 0:
+                    stock_value += quantity * avg_price
+                    # 경고: 첫 발생 시에만 출력 (반복 방지)
+                    if not hasattr(self, '_price_warning_shown'):
+                        self._price_warning_shown = set()
+                    if symbol not in self._price_warning_shown:
+                        print(f'   [경고] {symbol}: 가격 데이터 없음, 매수가({avg_price:,.0f}원)로 평가')
+                        self._price_warning_shown.add(symbol)
         
         total_value = self.cash + stock_value
         return total_value
