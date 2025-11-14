@@ -67,11 +67,15 @@ class PortfolioSummary(BaseModel):
 class TradeRecord(BaseModel):
     """거래 기록"""
     date: int
+    time_slot: Optional[str] = None  # 거래 시간 (예: '1020_1030')
     symbol: str
     action: str
     quantity: float
     price: float
     total: float
+    buy_price: Optional[float] = None  # 매수 평균가 (매도 시에만)
+    profit_loss: Optional[float] = None  # 손익 금액 (매도 시에만)
+    profit_loss_percent: Optional[float] = None  # 손익률 (매도 시에만)
 
 class BacktestStatus(BaseModel):
     """백테스팅 상태"""
@@ -86,6 +90,8 @@ class BacktestResults(BaseModel):
     initial_capital: float
     final_value: float
     total_return: float
+    kospi_return: Optional[float] = None  # 코스피 수익률
+    excess_return: Optional[float] = None  # 초과 수익률
     sharpe_ratio: float
     mdd: float
     total_trades: int
@@ -153,10 +159,16 @@ def run_backtest_task():
         sell_trades = len([t for t in trades if t['action'] == 'SELL'])
         total_return = ((final_value - initial_capital) / initial_capital) * 100
         
+        # 코스피 수익률 계산
+        kospi_return = backtest_state.backtest._calculate_kospi_return()
+        excess_return = total_return - kospi_return if kospi_return is not None else None
+        
         backtest_state.results_cache = {
             "initial_capital": float(initial_capital),
             "final_value": float(final_value),
             "total_return": float(total_return),
+            "kospi_return": float(kospi_return) if kospi_return is not None else None,
+            "excess_return": float(excess_return) if excess_return is not None else None,
             "sharpe_ratio": float(sharpe),
             "mdd": float(mdd),
             "total_trades": len(trades),
@@ -172,6 +184,9 @@ def run_backtest_task():
         logger.info(f"💰 초기 자본: {initial_capital:,.0f}원")
         logger.info(f"💵 최종 자산: {final_value:,.0f}원")
         logger.info(f"📈 총 수익률: {total_return:+.2f}%")
+        if kospi_return is not None:
+            logger.info(f"🏦 코스피 수익률: {kospi_return:+.2f}%")
+            logger.info(f"✨ 초과 수익률 (알파): {excess_return:+.2f}%p")
         logger.info(f"📊 Sharpe Ratio: {sharpe:.2f}")
         logger.info(f"📉 MDD: {mdd:.2f}%")
         logger.info(f"🔄 총 거래: {len(trades)}회 (매수: {buy_trades}, 매도: {sell_trades})")
@@ -383,10 +398,16 @@ async def get_backtest_results():
     drawdown = (history_df['total_value'] - cummax) / cummax
     mdd = drawdown.min() * 100
     
+    # 코스피 수익률 계산
+    kospi_return = backtest._calculate_kospi_return()
+    excess_return = total_return - kospi_return if kospi_return is not None else None
+    
     return BacktestResults(
         initial_capital=float(initial_capital),
         final_value=float(final_value),
         total_return=float(total_return),
+        kospi_return=float(kospi_return) if kospi_return is not None else None,
+        excess_return=float(excess_return) if excess_return is not None else None,
         sharpe_ratio=float(sharpe),
         mdd=float(mdd),
         total_trades=len(trades),

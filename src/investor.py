@@ -100,17 +100,21 @@ class Investor:
         # 거래 기록
         self.trade_history.append({
             'date': date,
+            'time_slot': time_slot,  # 거래 시간 추가
             'symbol': symbol,
             'action': 'BUY',
             'quantity': quantity,
             'price': price,
-            'total': total_cost
+            'total': total_cost,
+            'buy_price': None,  # 매수는 해당 없음
+            'profit_loss': None,  # 매수는 해당 없음
+            'profit_loss_percent': None  # 매수는 해당 없음
         })
         
         return True
     
     
-    def sell(self, symbol, quantity, price, date):
+    def sell(self, symbol, quantity, price, date, time_slot=None):
         """
         매도 실행 (가격 검증 추가)
         
@@ -119,6 +123,7 @@ class Investor:
         - quantity: 수량
         - price: 가격
         - date: 거래 날짜
+        - time_slot: 거래 시간 (문자열, 예: '1020_1030', 생략 가능)
         
         Returns:
         - bool: 성공 여부
@@ -142,6 +147,11 @@ class Investor:
         
         total_revenue = quantity * price
         
+        # 시세차익 계산 (매도가 - 매수가)
+        avg_buy_price = self.portfolio[symbol]['avg_price']
+        profit_loss = (price - avg_buy_price) * quantity
+        profit_loss_percent = ((price - avg_buy_price) / avg_buy_price) * 100 if avg_buy_price > 0 else 0
+        
         # 현금 증가
         self.cash += total_revenue
         
@@ -155,11 +165,15 @@ class Investor:
         # 거래 기록
         self.trade_history.append({
             'date': date,
+            'time_slot': time_slot,  # 거래 시간 추가
             'symbol': symbol,
             'action': 'SELL',
             'quantity': quantity,
             'price': price,
-            'total': total_revenue
+            'total': total_revenue,
+            'buy_price': avg_buy_price,  # 매수 평균가
+            'profit_loss': profit_loss,  # 손익 금액
+            'profit_loss_percent': profit_loss_percent  # 손익률
         })
         
         return True
@@ -513,11 +527,15 @@ class Investor:
         return [
             {
                 'date': trade['date'],
+                'time_slot': trade.get('time_slot'),  # 거래 시간 추가
                 'symbol': trade['symbol'],
                 'action': trade['action'],
                 'quantity': float(trade['quantity']),
                 'price': float(trade['price']),
-                'total': float(trade['total'])
+                'total': float(trade['total']),
+                'buy_price': float(trade['buy_price']) if trade.get('buy_price') is not None else None,
+                'profit_loss': float(trade['profit_loss']) if trade.get('profit_loss') is not None else None,
+                'profit_loss_percent': float(trade['profit_loss_percent']) if trade.get('profit_loss_percent') is not None else None
             }
             for trade in self.trade_history
         ]

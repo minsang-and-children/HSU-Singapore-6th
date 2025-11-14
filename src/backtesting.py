@@ -419,7 +419,7 @@ class Backtesting:
             
             # 가격이 유효하면 매도
             if price is not None and not pd.isna(price) and price > 0:
-                success = self.investor.sell(symbol, quantity, price, date_int)
+                success = self.investor.sell(symbol, quantity, price, date_int, time_slot)
                 if success:
                     logging.info(f'  └─ {symbol}: {quantity}주 매도 (단가: {price:,.0f}원)')
             else:
@@ -632,6 +632,10 @@ class Backtesting:
         buy_trades = len([t for t in self.investor.trade_history if t['action'] == 'BUY'])
         sell_trades = len([t for t in self.investor.trade_history if t['action'] == 'SELL'])
         
+        # 코스피 수익률 계산
+        kospi_return = self._calculate_kospi_return()
+        excess_return = total_return - kospi_return if kospi_return is not None else None
+        
         # 결과 출력
         print(f'\n[성과 요약]')
         print(f'   초기 자본금:     {self.initial_capital:>15,}원')
@@ -639,6 +643,9 @@ class Backtesting:
         print(f'   └─ 현금:         {final_cash:>15,.0f}원')
         print(f'   └─ 주식:         {final_stock:>15,.0f}원')
         print(f'   총 수익률:       {total_return:>15.2f}%')
+        if kospi_return is not None:
+            print(f'   코스피 수익률:   {kospi_return:>15.2f}%')
+            print(f'   초과 수익률:     {excess_return:>15.2f}%p')
         
         print(f'\n[위험 지표]')
         print(f'   샤프 비율:       {sharpe_ratio:>15.2f}')
@@ -664,6 +671,96 @@ class Backtesting:
             print(f'   보유 종목 없음')
         
         print(f'\n' + '=' * 80)
+    
+    
+    def _calculate_kospi_return(self):
+        """
+        백테스팅 기간 동안의 코스피 수익률 계산
+        
+        Returns:
+        - float: 코스피 수익률 (%), None if 계산 실패
+        """
+        try:
+            import pandas as pd
+            import os
+            
+            # kospi.csv 파일 경로
+            kospi_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'kospi.csv')
+            logging.info(f'코스피 파일 경로: {kospi_path}')
+            
+            # 파일 존재 확인
+            if not os.path.exists(kospi_path):
+                logging.error(f'코스피 파일이 존재하지 않습니다: {kospi_path}')
+                return None
+            
+            # 코스피 데이터 로드
+            kospi_df = pd.read_csv(kospi_path)
+            kospi_df.columns = kospi_df.columns.str.strip()  # 공백 제거
+            logging.info(f'코스피 데이터 로드 완료: {len(kospi_df)}행')
+            logging.info(f'코스피 컬럼: {kospi_df.columns.tolist()}')
+            
+            # 날짜를 정수로 변환
+            if 'Unnamed: 0' in kospi_df.columns:
+                kospi_df['date'] = kospi_df['Unnamed: 0'].astype(int)
+            else:
+                kospi_df['date'] = kospi_df.iloc[:, 0].astype(int)
+            
+            # 시작일과 종료일을 정수로 변환 (pandas Timestamp 객체 처리)
+            if hasattr(self.start_date, 'strftime'):
+                # pandas Timestamp 객체인 경우
+                start_date_int = int(self.start_date.strftime('%Y%m%d'))
+                end_date_int = int(self.end_date.strftime('%Y%m%d'))
+            else:
+                # 문자열인 경우
+                start_date_int = int(str(self.start_date).replace('-', ''))
+                end_date_int = int(str(self.end_date).replace('-', ''))
+            logging.info(f'백테스팅 기간: {start_date_int} ~ {end_date_int}')
+            
+            # 시작일과 종료일의 코스피 지수 찾기
+            start_kospi = kospi_df[kospi_df['date'] == start_date_int]['close']
+            end_kospi = kospi_df[kospi_df['date'] == end_date_int]['close']
+            
+            # 정확한 날짜가 없으면 가장 가까운 날짜 찾기
+            if len(start_kospi) == 0:
+                # 시작일 이후 첫 거래일
+                available_dates = kospi_df[kospi_df['date'] >= start_date_int]
+                if len(available_dates) > 0:
+                    start_kospi = available_dates.iloc[0]['close']
+                    actual_start_date = available_dates.iloc[0]['date']
+                    logging.info(f'시작일 {start_date_int} → 가장 가까운 날짜 {actual_start_date} 사용')
+                else:
+                    start_kospi = None
+            else:
+                start_kospi = start_kospi.values[0]
+                logging.info(f'시작일 {start_date_int} 코스피: {start_kospi}')
+            
+            if len(end_kospi) == 0:
+                # 종료일 이전 마지막 거래일
+                available_dates = kospi_df[kospi_df['date'] <= end_date_int]
+                if len(available_dates) > 0:
+                    end_kospi = available_dates.iloc[-1]['close']
+                    actual_end_date = available_dates.iloc[-1]['date']
+                    logging.info(f'종료일 {end_date_int} → 가장 가까운 날짜 {actual_end_date} 사용')
+                else:
+                    end_kospi = None
+            else:
+                end_kospi = end_kospi.values[0]
+                logging.info(f'종료일 {end_date_int} 코스피: {end_kospi}')
+            
+            # 수익률 계산
+            if start_kospi is not None and end_kospi is not None and start_kospi > 0:
+                kospi_return = ((end_kospi - start_kospi) / start_kospi) * 100
+                logging.info(f'✅ 코스피 수익률 계산 완료: {kospi_return:.2f}%')
+                return kospi_return
+            else:
+                logging.warning(f'❌ 코스피 데이터를 찾을 수 없습니다: start={start_kospi}, end={end_kospi}')
+                return None
+                
+        except Exception as e:
+            logging.error(f'❌ 코스피 수익률 계산 실패: {e}')
+            import traceback
+            logging.error(traceback.format_exc())
+            return None
     
     
     def get_history_df(self):

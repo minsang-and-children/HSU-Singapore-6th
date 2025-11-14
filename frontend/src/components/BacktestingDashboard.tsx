@@ -38,6 +38,8 @@ interface BacktestResults {
   initial_capital: number;
   final_value: number;
   total_return: number;
+  kospi_return?: number | null;  // 코스피 수익률
+  excess_return?: number | null;  // 초과 수익률
   sharpe_ratio: number;
   mdd: number;
   total_trades: number;
@@ -46,10 +48,24 @@ interface BacktestResults {
   trading_days: number;
 }
 
+interface TradeRecord {
+  date: number;
+  time_slot?: string | null;  // 거래 시간
+  symbol: string;
+  action: string;
+  quantity: number;
+  price: number;
+  total: number;
+  buy_price?: number | null;  // 매수 평균가 (매도 시에만)
+  profit_loss?: number | null;  // 손익 금액 (매도 시에만)
+  profit_loss_percent?: number | null;  // 손익률 (매도 시에만)
+}
+
 export const BacktestingDashboard: React.FC = () => {
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
   const [status, setStatus] = useState<BacktestStatus | null>(null);
   const [results, setResults] = useState<BacktestResults | null>(null);
+  const [tradeHistory, setTradeHistory] = useState<TradeRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // 상태 폴링 (1초마다)
@@ -62,8 +78,9 @@ export const BacktestingDashboard: React.FC = () => {
         await fetchPortfolio();
       }, 1000);
     } else if (status?.status === 'completed' && !results) {
-      // 완료되면 결과 가져오기
+      // 완료되면 결과 및 거래 이력 가져오기
       fetchResults();
+      fetchTradeHistory();
     }
 
     return () => {
@@ -98,10 +115,25 @@ export const BacktestingDashboard: React.FC = () => {
       const res = await fetch(`${API_BASE}/api/backtesting/results`);
       if (res.ok) {
         const data = await res.json();
+        console.log('📊 백테스팅 결과 받음:', data);
+        console.log('🏦 코스피 수익률:', data.kospi_return);
+        console.log('📈 초과 수익률:', data.excess_return);
         setResults(data);
       }
     } catch (error) {
       console.error('Results fetch error:', error);
+    }
+  };
+
+  const fetchTradeHistory = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/backtesting/trades`);
+      if (res.ok) {
+        const data = await res.json();
+        setTradeHistory(data);
+      }
+    } catch (error) {
+      console.error('Trade history fetch error:', error);
     }
   };
 
@@ -150,6 +182,7 @@ export const BacktestingDashboard: React.FC = () => {
       setPortfolio(null);
       setStatus(null);
       setResults(null);
+      setTradeHistory([]);
     } catch (error) {
       console.error('Reset error:', error);
     }
@@ -287,6 +320,55 @@ export const BacktestingDashboard: React.FC = () => {
       {results && (
         <div style={{ marginBottom: '30px' }}>
           <h2>✅ 백테스팅 최종 결과</h2>
+          
+          {/* 코스피 비교 섹션 */}
+          {results.kospi_return !== null && results.kospi_return !== undefined && (
+            <div style={{ 
+              padding: '20px', 
+              backgroundColor: '#f8f9fa', 
+              borderRadius: '8px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              marginBottom: '20px'
+            }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '16px', color: '#333' }}>
+                📊 벤치마크 비교 (KOSPI)
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                <div style={{ textAlign: 'center', padding: '15px', backgroundColor: 'white', borderRadius: '8px' }}>
+                  <div style={{ color: '#666', fontSize: '12px', marginBottom: '8px' }}>내 수익률</div>
+                  <div style={{ 
+                    fontSize: '24px', 
+                    fontWeight: 'bold', 
+                    color: results.total_return >= 0 ? '#4CAF50' : '#F44336' 
+                  }}>
+                    {results.total_return >= 0 ? '+' : ''}{results.total_return.toFixed(2)}%
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '15px', backgroundColor: 'white', borderRadius: '8px' }}>
+                  <div style={{ color: '#666', fontSize: '12px', marginBottom: '8px' }}>코스피 수익률</div>
+                  <div style={{ 
+                    fontSize: '24px', 
+                    fontWeight: 'bold', 
+                    color: results.kospi_return >= 0 ? '#2196F3' : '#FF9800' 
+                  }}>
+                    {results.kospi_return >= 0 ? '+' : ''}{results.kospi_return.toFixed(2)}%
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '15px', backgroundColor: 'white', borderRadius: '8px' }}>
+                  <div style={{ color: '#666', fontSize: '12px', marginBottom: '8px' }}>초과 수익률 (알파)</div>
+                  <div style={{ 
+                    fontSize: '24px', 
+                    fontWeight: 'bold', 
+                    color: results.excess_return && results.excess_return >= 0 ? '#4CAF50' : '#F44336' 
+                  }}>
+                    {results.excess_return && results.excess_return >= 0 ? '+' : ''}
+                    {results.excess_return?.toFixed(2)}%p
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px' }}>
             {[
               { label: '초기 자본', value: formatNumber(results.initial_capital) + '원' },
@@ -431,6 +513,176 @@ export const BacktestingDashboard: React.FC = () => {
           color: '#666'
         }}>
           현재 보유 중인 종목이 없습니다.
+        </div>
+      )}
+
+      {/* 거래 이력 */}
+      {tradeHistory.length > 0 && (
+        <div style={{ marginTop: '30px' }}>
+          <h2>📋 거래 이력 ({tradeHistory.length}건)</h2>
+          <div style={{ overflowX: 'auto', maxHeight: '600px', overflowY: 'auto' }}>
+            <table style={{ 
+              width: '100%', 
+              borderCollapse: 'collapse',
+              backgroundColor: 'white',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}>
+              <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f5f5f5', zIndex: 1 }}>
+                <tr>
+                  <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>날짜 / 시간</th>
+                  <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>종목</th>
+                  <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>구분</th>
+                  <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'right' }}>수량</th>
+                  <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'right' }}>매수가</th>
+                  <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'right' }}>매도가</th>
+                  <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'right' }}>총 금액</th>
+                  <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'right' }}>손익</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tradeHistory.slice().reverse().map((trade, idx) => {
+                  const dateStr = String(trade.date);
+                  const formattedDate = dateStr.length === 8 
+                    ? `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}`
+                    : dateStr;
+                  
+                  // 시간 포맷팅 (0900_0910 -> 09:00-09:10)
+                  const formattedTime = trade.time_slot 
+                    ? `${trade.time_slot.slice(0, 2)}:${trade.time_slot.slice(2, 4)}-${trade.time_slot.slice(5, 7)}:${trade.time_slot.slice(7, 9)}`
+                    : '';
+                  
+                  const isBuy = trade.action === 'BUY';
+                  const actionColor = isBuy ? '#4CAF50' : '#F44336';
+                  const actionBg = isBuy ? '#E8F5E9' : '#FFEBEE';
+                  
+                  return (
+                    <tr key={idx} style={{ 
+                      backgroundColor: idx % 2 === 0 ? 'white' : '#fafafa',
+                      borderBottom: '1px solid #eee'
+                    }}>
+                      <td style={{ border: '1px solid #ddd', padding: '12px' }}>
+                        <div style={{ fontWeight: 'bold' }}>{formattedDate}</div>
+                        {formattedTime && (
+                          <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                            {formattedTime}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ border: '1px solid #ddd', padding: '12px', fontWeight: 'bold' }}>
+                        {trade.symbol}
+                      </td>
+                      <td style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'center' }}>
+                        <span style={{ 
+                          padding: '4px 12px', 
+                          borderRadius: '4px', 
+                          backgroundColor: actionBg,
+                          color: actionColor,
+                          fontWeight: 'bold',
+                          fontSize: '13px'
+                        }}>
+                          {isBuy ? '매수' : '매도'}
+                        </span>
+                      </td>
+                      <td style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'right' }}>
+                        {formatNumber(trade.quantity)}
+                      </td>
+                      <td style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'right' }}>
+                        {isBuy ? formatNumber(trade.price) + '원' : (trade.buy_price ? formatNumber(trade.buy_price) + '원' : '-')}
+                      </td>
+                      <td style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'right' }}>
+                        {isBuy ? '-' : formatNumber(trade.price) + '원'}
+                      </td>
+                      <td style={{ 
+                        border: '1px solid #ddd', 
+                        padding: '12px', 
+                        textAlign: 'right',
+                        fontWeight: 'bold',
+                        color: actionColor
+                      }}>
+                        {isBuy ? '-' : '+'}{formatNumber(trade.total)}원
+                      </td>
+                      <td style={{ 
+                        border: '1px solid #ddd', 
+                        padding: '12px', 
+                        textAlign: 'right',
+                        fontWeight: 'bold',
+                        color: trade.profit_loss && trade.profit_loss >= 0 ? '#4CAF50' : '#F44336'
+                      }}>
+                        {isBuy ? '-' : (
+                          trade.profit_loss !== null && trade.profit_loss !== undefined ? (
+                            <>
+                              {trade.profit_loss >= 0 ? '+' : ''}{formatNumber(trade.profit_loss)}원
+                              <br />
+                              <span style={{ fontSize: '12px' }}>
+                                ({trade.profit_loss_percent && trade.profit_loss_percent >= 0 ? '+' : ''}
+                                {trade.profit_loss_percent?.toFixed(2)}%)
+                              </span>
+                            </>
+                          ) : '-'
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* 거래 이력 요약 */}
+          <div style={{ 
+            marginTop: '15px', 
+            padding: '15px', 
+            backgroundColor: '#f5f5f5', 
+            borderRadius: '8px',
+            display: 'flex',
+            gap: '30px',
+            flexWrap: 'wrap'
+          }}>
+            <div>
+              <span style={{ color: '#666', fontSize: '14px' }}>총 거래: </span>
+              <span style={{ fontWeight: 'bold', fontSize: '16px' }}>{tradeHistory.length}건</span>
+            </div>
+            <div>
+              <span style={{ color: '#666', fontSize: '14px' }}>매수: </span>
+              <span style={{ fontWeight: 'bold', fontSize: '16px', color: '#4CAF50' }}>
+                {tradeHistory.filter(t => t.action === 'BUY').length}건
+              </span>
+            </div>
+            <div>
+              <span style={{ color: '#666', fontSize: '14px' }}>매도: </span>
+              <span style={{ fontWeight: 'bold', fontSize: '16px', color: '#F44336' }}>
+                {tradeHistory.filter(t => t.action === 'SELL').length}건
+              </span>
+            </div>
+            <div>
+              <span style={{ color: '#666', fontSize: '14px' }}>총 매수액: </span>
+              <span style={{ fontWeight: 'bold', fontSize: '16px', color: '#F44336' }}>
+                {formatNumber(tradeHistory.filter(t => t.action === 'BUY').reduce((sum, t) => sum + t.total, 0))}원
+              </span>
+            </div>
+            <div>
+              <span style={{ color: '#666', fontSize: '14px' }}>총 매도액: </span>
+              <span style={{ fontWeight: 'bold', fontSize: '16px', color: '#4CAF50' }}>
+                {formatNumber(tradeHistory.filter(t => t.action === 'SELL').reduce((sum, t) => sum + t.total, 0))}원
+              </span>
+            </div>
+            <div>
+              <span style={{ color: '#666', fontSize: '14px' }}>총 시세차익: </span>
+              <span style={{ 
+                fontWeight: 'bold', 
+                fontSize: '18px', 
+                color: (() => {
+                  const totalProfit = tradeHistory.filter(t => t.action === 'SELL' && t.profit_loss !== null).reduce((sum, t) => sum + (t.profit_loss || 0), 0);
+                  return totalProfit >= 0 ? '#4CAF50' : '#F44336';
+                })()
+              }}>
+                {(() => {
+                  const totalProfit = tradeHistory.filter(t => t.action === 'SELL' && t.profit_loss !== null).reduce((sum, t) => sum + (t.profit_loss || 0), 0);
+                  return (totalProfit >= 0 ? '+' : '') + formatNumber(totalProfit) + '원';
+                })()}
+              </span>
+            </div>
+          </div>
         </div>
       )}
     </div>

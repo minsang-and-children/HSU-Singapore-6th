@@ -50,8 +50,8 @@ MIN_SAMPLE_SIZE = 20                    # 최소 샘플 크기 (30 → 20으로 
 
 # 홀딩 기간 설정
 HOLDING_PERIOD_ENABLED = True          # 홀딩 기간 규칙 사용 여부
-HOLDING_PERIOD_UNIT = 'minutes'            # 'minutes' 또는 'days'
-HOLDING_PERIOD_VALUE = 90               # 홀딩 기간 (분 또는 일)
+HOLDING_PERIOD_UNIT = 'days'            # 'minutes' 또는 'days'
+HOLDING_PERIOD_VALUE = 15               # 홀딩 기간 (분 또는 일)
 # 예시:
 #   - HOLDING_PERIOD_UNIT='minutes', VALUE=60 → 매수 후 60분(1시간) 후 매도
 #   - HOLDING_PERIOD_UNIT='days', VALUE=30 → 매수 후 30일 후 매도
