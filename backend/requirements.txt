@@ -1,0 +1,14 @@
+# Presto Backtesting API 의존성
+# 백테스팅 전용 - 최소 구성
+
+# FastAPI 핵심
+fastapi==0.115.5
+uvicorn==0.30.6
+pydantic==2.9.2
+pydantic-settings==2.5.2
+
+# 데이터 처리
+pandas==2.2.0
+
+# 유틸리티
+python-dotenv==1.0.1
