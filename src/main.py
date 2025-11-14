@@ -2,6 +2,7 @@
 백테스팅 실행 메인 스크립트
 """
 from backtesting import Backtesting
+import config
 
 # ==================== 백테스팅 설정 ====================
 # 통계적 임계값 가이드:
@@ -13,17 +14,17 @@ from backtesting import Backtesting
 #   최대 Z-score: 0.94
 #   최소 Z-score: -1.85
 
-# 백테스팅 초기화
+# 백테스팅 초기화 (config.py에서 임계값 가져오기)
 backtest = Backtesting(
     start_date='2024-01-04',
     end_date='2024-12-31',
-    initial_capital=100_000_000,  # 1억원
+    initial_capital=config.DEFAULT_INITIAL_CAPITAL,
     symbols=None,  # 전체 종목 (None이면 전체)
-    long_threshold=0.4,  # Long 임계값
-    short_threshold=-0.4,  # Short 임계값
+    long_threshold=config.DEFAULT_LONG_THRESHOLD,  # config.py에서 가져오기
+    short_threshold=config.DEFAULT_SHORT_THRESHOLD,  # config.py에서 가져오기
     enable_short=False,  # Short 전략 사용 여부
-    zscore_type='mom',  # 'mom', 'yoy', 'qoq' 중 선택
-    progress_interval=100  # 진행률 출력 간격
+    zscore_type=config.DEFAULT_ZSCORE_TYPE,  # config.py에서 가져오기
+    progress_interval=config.PROGRESS_REPORT_INTERVAL  # config.py에서 가져오기
 )
 
 # 백테스팅 실행

@@ -30,8 +30,8 @@ CLOSING_TIME_SLOT = '1520_1530'    # 포트폴리오 평가 시간 (15:20-15:30)
 
 # ==================== 백테스팅 설정 ====================
 DEFAULT_INITIAL_CAPITAL = 100_000_000   # 기본 초기 자본금 (1억원)
-DEFAULT_LONG_THRESHOLD = 2.0            # 기본 Long 임계값
-DEFAULT_SHORT_THRESHOLD = -2.0          # 기본 Short 임계값
+DEFAULT_LONG_THRESHOLD = 0.3            # 기본 Long 임계값 (0.4 → 0.3으로 낮춤)
+DEFAULT_SHORT_THRESHOLD = -0.3          # 기본 Short 임계값
 PROGRESS_REPORT_INTERVAL = 100          # 진행률 출력 간격 (타임스탬프 단위)
 
 
@@ -41,11 +41,11 @@ PORTFOLIO_WEIGHTING = 'equal'           # 포트폴리오 가중 방식 (equal, 
 
 # 민감도 기반 전략 설정
 USE_SENSITIVITY = True                  # 민감도 기반 임계값 조정 활성화
-MIN_PVALUE = 0.2                        # 최대 p-value (이보다 크면 제외)
-MIN_SAMPLE_SIZE = 30                    # 최소 샘플 크기 (미만이면 제외)
+MIN_PVALUE = 0.5                        # 최대 p-value (0.2 → 0.5로 완화)
+MIN_SAMPLE_SIZE = 20                    # 최소 샘플 크기 (30 → 20으로 완화)
 # 참고:
 #   - 보수적: MIN_PVALUE=0.05, MIN_SAMPLE_SIZE=100 → 유의미한 종목만
-#   - 공격적: MIN_PVALUE=0.2, MIN_SAMPLE_SIZE=20 → 더 많은 종목
+#   - 공격적: MIN_PVALUE=0.5, MIN_SAMPLE_SIZE=20 → 더 많은 종목 (현재 설정)
 #   - 균형: MIN_PVALUE=0.1, MIN_SAMPLE_SIZE=50
 
 # 홀딩 기간 설정

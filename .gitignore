@@ -1,3 +1,24 @@
 data/
 doc2/
 src2/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.pyc
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 임시 파일
+*.log
+*.tmp
+.env
